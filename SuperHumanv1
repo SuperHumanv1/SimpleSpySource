@@ -1,0 +1,170 @@
+-- โค้ด Lua Script ที่สมบูรณ์แบบสำหรับ Exploit Executor ใน Roblox
+-- จะมีการตรวจสอบคีย์ก่อน จากนั้นจะโหลด UI ขึ้นมาทันที
+-- **คีย์เข้าใช้งาน: HUMANV1**
+
+local Player = game.Players.LocalPlayer
+local $TARGET_KEY = "HUMANV1" -- คีย์เข้าใช้งานที่ถูกต้อง
+local KeyCorrect = false
+
+-- --------------------------------------------------------------------------------
+-- [ส่วนที่ 1: ระบบ Key System]
+-- --------------------------------------------------------------------------------
+
+local function GetKeyInput()
+    -- พยายามใช้ฟังก์ชันป้อนข้อมูลของ Executor ที่พบบ่อย
+    if syn and syn.request_input then
+        return syn.request_input({
+            Title = "Key Verification",
+            Text = "Enter the access key (" .. $TARGET_KEY .. ") to use the HumanV1 script.",
+            Placeholder = "Enter Key",
+            Numeric = false,
+        }) or ""
+    elseif getgenv().requestinput then
+        return getgenv().requestinput("Key Verification", "Enter the access key:", "Enter Key") or ""
+    elseif rawget(_G, 'Input') then
+        return rawget(_G, 'Input')("Key Verification", "Enter the access key:", "Enter Key") or ""
+    else
+        -- การทำงานฉุกเฉิน: ให้คีย์ถูกต้องทันทีเพื่อโหลด UI หากไม่สามารถแสดงป๊อปอัพได้
+        warn("Executor input function not found. Loading UI without proper key prompt.")
+        return $TARGET_KEY 
+    end
+end
+
+-- ลูปตรวจสอบคีย์
+while not KeyCorrect do
+    local InputKey = GetKeyInput()
+    
+    if InputKey == $TARGET_KEY then
+        KeyCorrect = true
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "SUCCESS!",
+            Text = "HumanV1 Script Loaded Successfully. UI is now active.",
+            Duration = 3,
+        })
+    else
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "ACCESS DENIED",
+            Text = "Invalid Key. Please try again. Key: " .. $TARGET_KEY,
+            Duration = 3,
+        })
+        wait(1) 
+    end
+end
+
+-- --------------------------------------------------------------------------------
+-- [ส่วนที่ 2: โค้ด UI หลักและฟังก์ชัน (โหลดทันทีหลังคีย์ถูกต้อง)]
+-- --------------------------------------------------------------------------------
+
+-- 1. โหลด Kavo UI Library
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+
+-- 2. สร้างหน้าต่างหลัก
+local Window = Library.CreateLib("HumanV1 - Advanced Control", "DarkTheme")
+
+-- 3. สร้างแท็บเมนู
+local AbilitiesTab = Window:NewTab("Abilities")
+local AdjustTab = Window:NewTab("Size")
+local GameControlTab = Window:NewTab("Game Controls") 
+
+local NoClipEnabled = false
+local DefaultSpeed = 16 
+
+-- **A. Abilities Tab (วิ่งทะลุ + วิ่งเร็ว)**
+local AbilitiesSection = AbilitiesTab:NewSection("Movement")
+
+AbilitiesSection:NewToggle("No-Clip (วิ่งทะลุ)", "ทำให้วิ่งทะลุกำแพง/สิ่งกีดขวางได้", function(state)
+    NoClipEnabled = state
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    if Character then
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = not state 
+            end
+        end
+    end
+end)
+
+AbilitiesSection:NewSlider("Run Speed (ความเร็ว)", "ปรับความเร็วในการวิ่ง (ค่าปกติคือ 16)", 
+    DefaultSpeed, 100,
+    function(value)
+        local Humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if Humanoid then Humanoid.WalkSpeed = value end
+    end
+)
+
+-- **B. Adjustment Tab (ปรับขนาดตัวละคร)**
+local SizeSection = AdjustTab:NewSection("Scale Adjustment")
+
+SizeSection:NewSlider("Height Scale (ความสูง)", "ปรับขนาดความสูงของตัวละคร (1.0 คือปกติ)", 
+    1.0, 5.0,
+    function(value)
+        local Humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if Humanoid and Humanoid:FindFirstChild("BodyHeightScale") then
+            Humanoid.BodyHeightScale.Value = value
+        end
+    end
+)
+
+SizeSection:NewSlider("Width Scale (ความอ้วน/กว้าง)", "ปรับขนาดความกว้างของตัวละคร (1.0 คือปกติ)", 
+    1.0, 5.0,
+    function(value)
+        local Humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if Humanoid and Humanoid:FindFirstChild("BodyWidthScale") then
+            Humanoid.BodyWidthScale.Value = value
+        end
+    end
+)
+
+SizeSection:NewButton("Reset Size (คืนค่าปกติ)", "คืนค่าความสูงและความกว้างกลับไปเป็น 1.0", function()
+    local Humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+    if Humanoid then
+        if Humanoid:FindFirstChild("BodyHeightScale") then Humanoid.BodyHeightScale.Value = 1.0 end
+        if Humanoid:FindFirstChild("BodyWidthScale") then Humanoid.BodyWidthScale.Value = 1.0 end
+    end
+end)
+
+-- **C. Game Control Tab (ปรับเสียงดัง)**
+local AudioSection = GameControlTab:NewSection("Audio Control")
+
+AudioSection:NewButton("📢 ปรับเสียงดัง (Radio/Audio)", "ตั้งค่า Volume เป็นค่าสูงสุดและสั่งให้เล่น", function()
+    local remoteEvent = workspace:FindFirstChild("DRadio_Script") and workspace.DRadio_Script:FindFirstChild("Event")
+
+    if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+        -- 1. ตั้งค่า Volume ให้สูงมาก
+        local args_volume = {
+            [1] = "SET_VOLUME",
+            [2] = 1000000 
+        }
+        remoteEvent:FireServer(unpack(args_volume))
+
+        -- 2. สั่งให้เล่น (PLAY)
+        local args_play = {
+            [1] = "PLAY"
+        }
+        remoteEvent:FireServer(unpack(args_play))
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Action Sent",
+            Text = "Sent SET_VOLUME and PLAY commands to DRadio_Script.",
+            Duration = 3,
+        })
+    else
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "Error",
+            Text = "RemoteEvent 'DRadio_Script.Event' not found in workspace!",
+            Duration = 5,
+        })
+    end
+end)
+
+-- **จัดการ No-Clip เมื่อเกิดใหม่**
+Player.CharacterAdded:Connect(function(Character)
+    if NoClipEnabled then
+        task.wait(0.1) 
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
